@@ -1,0 +1,123 @@
+<!doctype html>
+<html>
+    <head>
+        <title>Watch Try-On</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <style>
+            body {
+                margin: 0;
+                overflow: hidden;
+                background: black;
+            }
+
+            canvas {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+            }
+
+            #webarCanvas {
+                z-index: 1;
+            }
+            #threeCanvas {
+                z-index: 2;
+                pointer-events: none;
+            }
+        </style>
+    </head>
+    <body>
+        <canvas id="webarCanvas"></canvas>
+        <canvas id="threeCanvas"></canvas>
+
+        <script src="libs/WebARRocksHand.js"></script>
+
+        <script type="importmap">
+            {
+                "imports": {
+                    "three": "https://unpkg.com/three@0.152.2/build/three.module.js",
+                    "three/addons/": "https://unpkg.com/three@0.152.2/examples/jsm/"
+                }
+            }
+        </script>
+
+        <script type="module">
+            import * as THREE from "three";
+            import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+            let scene, camera, renderer, watch;
+
+            initThree();
+            initHand();
+            animate();
+
+            /* ---------- THREE ---------- */
+            function initThree() {
+                const canvas = document.getElementById("threeCanvas");
+
+                scene = new THREE.Scene();
+                camera = new THREE.PerspectiveCamera(
+                    40,
+                    window.innerWidth / window.innerHeight,
+                    0.1,
+                    100,
+                );
+                camera.position.z = 5;
+
+                renderer = new THREE.WebGLRenderer({
+                    canvas,
+                    alpha: true,
+                    antialias: true,
+                });
+                renderer.setPixelRatio(window.devicePixelRatio);
+                renderer.setSize(window.innerWidth, window.innerHeight, false);
+
+                const light = new THREE.DirectionalLight(0xffffff, 1);
+                light.position.set(0, 1, 2);
+                scene.add(light);
+
+                const loader = new GLTFLoader();
+                loader.load("models/watch.glb", (gltf) => {
+                    watch = gltf.scene;
+                    scene.add(watch);
+                });
+
+                window.addEventListener("resize", onResize);
+            }
+
+            function onResize() {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight, false);
+            }
+
+            /* ---------- WEBAR ---------- */
+            function initHand() {
+                const HandTracker = window.WEBARROCKSHAND;
+
+                HandTracker.init({
+                    canvasId: "webarCanvas",
+                    NNsPath: "neuralNetsHand/",
+
+                    callbackTrack: (hand) => {
+                        if (!watch || !hand || !hand.isDetected) return;
+
+                        const wrist = hand.landmarks[0];
+
+                        const x = (wrist.x - 0.5) * 4;
+                        const y = -(wrist.y - 0.5) * 4;
+
+                        watch.position.set(x, y, -2);
+                    },
+                });
+            }
+
+            /* ---------- LOOP ---------- */
+            function animate() {
+                requestAnimationFrame(animate);
+                if (renderer) renderer.render(scene, camera);
+            }
+        </script>
+    </body>
+</html>
