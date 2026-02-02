@@ -1,0 +1,189 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+        />
+
+        <title>WebAR.rocks – 2D Glasses Try-On</title>
+
+        <!-- WebAR core -->
+        <script src="./libs/WebARRocksFace.js"></script>
+
+        <!-- Official 2D helpers -->
+        <script src="./helpers/WebARRocksFaceCanvas2DHelper.js"></script>
+        <script src="./helpers/WebARRocksResizer.js"></script>
+        <script src="./helpers/landmarksStabilizers/WebARRocksLMStabilizer.js"></script>
+
+        <style>
+            body {
+                margin: 0;
+                background: #222;
+                overflow: hidden;
+            }
+
+            canvas {
+                position: absolute;
+                top: 0;
+                left: 50%;
+                transform: scaleX(-1) translateX(50%);
+                width: 100vw;
+                max-width: 100vh;
+                height: 100%;
+            }
+
+            #overlayCanvas {
+                z-index: 10;
+            }
+            #WebARRocksFaceCanvas {
+                z-index: 1;
+            }
+        </style>
+    </head>
+
+    <body>
+        <canvas id="overlayCanvas" width="600" height="600"></canvas>
+        <canvas id="WebARRocksFaceCanvas" width="600" height="600"></canvas>
+
+        <script>
+            const canvases = {
+                face: null,
+                overlay: null,
+            };
+
+            let ctx = null;
+            let glassesImg = null;
+
+            // smoothing state
+            const smooth = {
+                x: 0,
+                y: 0,
+                r: 0,
+                init: false,
+            };
+
+            const SMOOTHING = {
+                pos: 0.85,
+                rot: 0.9,
+            };
+
+            // helper: eye distance
+            function eyeDistance(lm) {
+                const l = lm.leftEyeExt;
+                const r = lm.rightEyeExt;
+                return Math.hypot(r[0] - l[0], r[1] - l[1]);
+            }
+
+            function start() {
+                WebARRocksFaceCanvas2DHelper.init({
+                    spec: {
+                        canvas: canvases.face,
+                        NNCPath: "./neuralNetsFace/NN_GLASSES_9.json",
+                    },
+
+                    callbackReady: function (err) {
+                        if (err) {
+                            console.error("WebAR init error:", err);
+                            return;
+                        }
+                        console.log("WebAR ready");
+                    },
+
+                    callbackTrack: function (state) {
+                        ctx.clearRect(
+                            0,
+                            0,
+                            canvases.overlay.width,
+                            canvases.overlay.height,
+                        );
+
+                        if (!state.isDetected || !glassesImg.complete) return;
+
+                        drawGlasses(
+                            state.landmarks,
+                            state.rz, // roll
+                            state.ry, // yaw
+                        );
+                    },
+                });
+            }
+
+            function drawGlasses(landmarks, rz, ry) {
+                const leftEye = landmarks.leftEyeExt;
+                const rightEye = landmarks.rightEyeExt;
+                const nose = landmarks.noseBottom;
+
+                // --- position: eye-center + light nose anchor ---
+                const eyeCenterY = (leftEye[1] + rightEye[1]) / 2;
+                const rawX = (leftEye[0] + rightEye[0]) / 2;
+                const rawY = eyeCenterY + (nose[1] - eyeCenterY) * 0.25;
+
+                // --- smoothing ---
+                if (!smooth.init) {
+                    smooth.x = rawX;
+                    smooth.y = rawY;
+                    smooth.r = rz;
+                    smooth.init = true;
+                } else {
+                    smooth.x =
+                        SMOOTHING.pos * smooth.x + (1 - SMOOTHING.pos) * rawX;
+                    smooth.y =
+                        SMOOTHING.pos * smooth.y + (1 - SMOOTHING.pos) * rawY;
+                    smooth.r =
+                        SMOOTHING.rot * smooth.r + (1 - SMOOTHING.rot) * rz;
+                }
+
+                // --- scale: eye-distance based (calibrated) ---
+                const eDist = eyeDistance(landmarks);
+                const scale = (eDist * 2.0) / glassesImg.width;
+
+                const w = scale * glassesImg.width;
+                const h = scale * glassesImg.height;
+
+                // --- lift slightly to sit on nose bridge ---
+                const verticalBias = -0.08 * h;
+
+                // --- yaw → fake 3D perspective ---
+                const yaw = Math.max(-0.6, Math.min(0.6, ry));
+                const squashX = Math.cos(yaw);
+
+                ctx.save();
+                ctx.translate(smooth.x, smooth.y + verticalBias);
+
+                // roll (head tilt)
+                ctx.rotate(smooth.r);
+
+                // fake perspective (head turn)
+                ctx.scale(squashX, 1);
+
+                // subtle depth shadow
+                ctx.shadowColor = "rgba(0,0,0,0.22)";
+                ctx.shadowBlur = w * 0.035;
+                ctx.shadowOffsetY = h * 0.025;
+
+                ctx.drawImage(glassesImg, -w / 2, -h / 2, w, h);
+                ctx.restore();
+            }
+
+            function main() {
+                glassesImg = new Image();
+                glassesImg.src = "./assets/glass.png";
+
+                canvases.face = document.getElementById("WebARRocksFaceCanvas");
+                canvases.overlay = document.getElementById("overlayCanvas");
+                ctx = canvases.overlay.getContext("2d");
+
+                WebARRocksResizer.size_canvas({
+                    canvas: canvases.face,
+                    overlayCanvas: [canvases.overlay],
+                    isFullScreen: false,
+                    callback: start,
+                });
+            }
+
+            window.addEventListener("load", main);
+        </script>
+    </body>
+</html>

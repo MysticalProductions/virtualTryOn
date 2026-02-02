@@ -1,128 +1,264 @@
 <!doctype html>
-<html>
+<html lang="en">
     <head>
-        <title>Glasses Try-On</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta charset="utf-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0, user-scalable=no"
+        />
+        <title>Eyewear Try-On</title>
+
+        <!-- THREE (GLOBAL BUILD) -->
+        <script src="https://unpkg.com/three@0.136.0/build/three.min.js"></script>
+        <script src="https://unpkg.com/three@0.136.0/examples/js/loaders/GLTFLoader.js"></script>
+
+        <!-- WEBAR CORE -->
+        <script src="./libs/WebARRocksFace.js"></script>
+
+        <!-- WEBAR HELPERS -->
+        <script src="./helpers/WebARRocksFaceThreeHelper.js"></script>
+        <script src="./helpers/WebARRocksMirror.js"></script>
+        <script src="./helpers/landmarksStabilizers/OneEuroLMStabilizer.js"></script>
+
+        <!-- SHARED PRODUCT DATA -->
+        <script src="js/products.js"></script>
+
         <style>
             body {
                 margin: 0;
-                overflow: hidden;
                 background: black;
+                overflow: hidden;
+                font-family:
+                    Inter,
+                    system-ui,
+                    -apple-system,
+                    sans-serif;
+                color: white;
             }
 
-            canvas {
+            /* CANVASES */
+            #WebARRocksFaceCanvas,
+            #threeCanvas {
                 position: fixed;
-                top: 0;
-                left: 0;
+                inset: 0;
                 width: 100vw;
                 height: 100vh;
             }
 
-            #webarCanvas {
-                z-index: 1;
+            #WebARRocksFaceCanvas {
+                z-index: 0;
             }
             #threeCanvas {
-                z-index: 2;
+                z-index: 1;
                 pointer-events: none;
+            }
+
+            /* TOP BAR */
+            .topbar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 56px;
+                display: flex;
+                align-items: center;
+                padding: 0 16px;
+                z-index: 5;
+                background: rgba(0, 0, 0, 0.5);
+                backdrop-filter: blur(10px);
+            }
+
+            .back {
+                cursor: pointer;
+                font-size: 14px;
+                color: #ccc;
+            }
+
+            .brand {
+                margin: auto;
+                font-weight: 600;
+                letter-spacing: 0.5px;
+            }
+
+            /* PRODUCT PANEL */
+            .panel {
+                position: fixed;
+                top: 72px;
+                right: 16px;
+                width: 320px;
+                z-index: 5;
+                padding: 18px;
+                background: rgba(15, 17, 21, 0.92);
+                backdrop-filter: blur(14px);
+                border-radius: 16px;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+            }
+
+            .title {
+                font-size: 20px;
+                margin-bottom: 4px;
+            }
+
+            .price {
+                font-size: 18px;
+                color: #4f8cff;
+                margin-bottom: 8px;
+            }
+
+            .desc {
+                font-size: 13px;
+                color: #aaa;
+                margin-bottom: 14px;
+            }
+
+            .switcher {
+                display: flex;
+                gap: 10px;
+                margin-bottom: 14px;
+            }
+
+            .switcher button {
+                flex: 1;
+                padding: 10px;
+                border-radius: 10px;
+                border: none;
+                cursor: pointer;
+                background: #2a2f3f;
+                color: white;
+                font-size: 13px;
+            }
+
+            .switcher button.active {
+                background: #4f8cff;
+            }
+
+            .cta {
+                width: 100%;
+                padding: 14px;
+                border-radius: 12px;
+                border: none;
+                font-size: 15px;
+                background: #4f8cff;
+                color: white;
+                cursor: pointer;
+            }
+
+            /* MOBILE */
+            @media (max-width: 768px) {
+                .panel {
+                    top: 64px;
+                    left: 50%;
+                    right: auto;
+                    transform: translateX(-50%);
+                    width: calc(100% - 32px);
+                    max-width: 420px;
+                }
             }
         </style>
     </head>
+
     <body>
-        <canvas id="webarCanvas"></canvas>
+        <!-- CANVASES -->
+        <canvas id="WebARRocksFaceCanvas"></canvas>
         <canvas id="threeCanvas"></canvas>
 
-        <script src="libs/WebARRocksFace.js"></script>
+        <!-- TOP BAR -->
+        <div class="topbar">
+            <div class="back" onclick="goBack()">← Back</div>
+            <div class="brand">VisionXR</div>
+        </div>
 
-        <script type="importmap">
-            {
-                "imports": {
-                    "three": "https://unpkg.com/three@0.152.2/build/three.module.js",
-                    "three/addons/": "https://unpkg.com/three@0.152.2/examples/jsm/"
-                }
-            }
-        </script>
+        <!-- PRODUCT PANEL -->
+        <div class="panel">
+            <div class="title" id="title"></div>
+            <div class="price" id="price"></div>
+            <div class="desc" id="desc"></div>
 
-        <script type="module">
-            import * as THREE from "three";
-            import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+            <div class="switcher" id="switcher"></div>
 
-            let scene, camera, renderer, glasses;
+            <button class="cta">Add to Cart</button>
+        </div>
 
-            initThree();
-            initFace();
-            animate();
+        <script>
+            let currentProduct;
 
-            /* ---------- THREE ---------- */
-            function initThree() {
-                const canvas = document.getElementById("threeCanvas");
-
-                scene = new THREE.Scene();
-                camera = new THREE.PerspectiveCamera(
-                    40,
-                    window.innerWidth / window.innerHeight,
-                    0.1,
-                    100,
-                );
-                camera.position.z = 5;
-
-                renderer = new THREE.WebGLRenderer({
-                    canvas,
-                    alpha: true,
-                    antialias: true,
-                });
-                renderer.setPixelRatio(window.devicePixelRatio);
-                renderer.setSize(window.innerWidth, window.innerHeight, false);
-
-                const light = new THREE.DirectionalLight(0xffffff, 1);
-                light.position.set(0, 1, 2);
-                scene.add(light);
-
-                const loader = new GLTFLoader();
-                loader.load("models/glasses.glb", (gltf) => {
-                    glasses = gltf.scene;
-                    scene.add(glasses);
-                });
-
-                window.addEventListener("resize", onResize);
+            function getSelectedProduct() {
+                const params = new URLSearchParams(window.location.search);
+                const id = parseInt(params.get("product"), 10);
+                return PRODUCTS[id] || Object.values(PRODUCTS)[0];
             }
 
-            function onResize() {
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight, false);
+            function renderSwitcher(activeId) {
+                const container = document.getElementById("switcher");
+                container.innerHTML = "";
+
+                Object.values(PRODUCTS)
+                    .filter((p) => p.type === "glasses")
+                    .forEach((p) => {
+                        const btn = document.createElement("button");
+                        btn.textContent = p.name;
+                        btn.className = p.id === activeId ? "active" : "";
+                        btn.onclick = () => selectProduct(p.id);
+                        container.appendChild(btn);
+                    });
             }
 
-            /* ---------- WEBAR ---------- */
-            function initFace() {
-                const FaceTracker = window.WEBARROCKSFACE;
+            function selectProduct(id) {
+                const p = PRODUCTS[id];
+                if (!p) return;
 
-                FaceTracker.init({
-                    canvasId: "webarCanvas",
-                    isDisplayVideo: true,
-                    isMirror: true,
+                currentProduct = p;
 
-                    callbackReady: () => {
-                        const c = document.getElementById("webarCanvas");
-                        c.width = window.innerWidth;
-                        c.height = window.innerHeight;
-                        console.log("Camera should now be visible");
+                history.replaceState({}, "", `?product=${id}`);
+
+                document.getElementById("title").innerText = p.name;
+                document.getElementById("price").innerText = p.price;
+                document.getElementById("desc").innerText = p.desc;
+
+                WebARRocksMirror.load(p.model);
+                renderSwitcher(id);
+            }
+
+            function main() {
+                currentProduct = getSelectedProduct();
+
+                document.getElementById("title").innerText =
+                    currentProduct.name;
+                document.getElementById("price").innerText =
+                    currentProduct.price;
+                document.getElementById("desc").innerText = currentProduct.desc;
+
+                WebARRocksMirror.init({
+                    canvasFace: document.getElementById("WebARRocksFaceCanvas"),
+                    canvasThree: document.getElementById("threeCanvas"),
+
+                    specWebARRocksFace: {
+                        NNCPath: "./neuralNetsFace/NN_GLASSES_9.json",
+                        maxFacesDetected: 1,
                     },
 
-                    callbackTrack: (state) => {
-                        if (!glasses || !state.isDetected) return;
+                    modelURL: currentProduct.model,
+                    occluderURL: false,
 
-                        glasses.position.set(state.x * 2, state.y * 2, -2);
-                        glasses.rotation.set(state.rx, state.ry, state.rz);
-                        glasses.scale.setScalar(state.s * 2);
-                    },
+                    width: window.innerWidth,
+                    height: window.innerHeight,
+                });
+
+                renderSwitcher(currentProduct.id);
+
+                window.addEventListener("resize", () => {
+                    WebARRocksMirror.resize(
+                        window.innerWidth,
+                        window.innerHeight,
+                    );
                 });
             }
 
-            /* ---------- LOOP ---------- */
-            function animate() {
-                requestAnimationFrame(animate);
-                if (renderer) renderer.render(scene, camera);
+            function goBack() {
+                window.history.back();
             }
+
+            window.addEventListener("load", main);
         </script>
     </body>
 </html>

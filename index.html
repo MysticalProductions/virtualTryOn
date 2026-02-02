@@ -1,12 +1,249 @@
 <!doctype html>
-<html>
+<html lang="en">
     <head>
-        <title>WebAR Try-On</title>
-    </head>
-    <body style="text-align: center; font-family: sans-serif">
-        <h2>WebAR Try-On Demo</h2>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>VisionXR — Virtual Try-On Store</title>
 
-        <a href="face.html">👓 Glasses Try-On</a><br /><br />
-        <a href="hand.html">⌚ Watch Try-On</a>
+        <!-- Product data (single source of truth) -->
+        <script src="js/products.js"></script>
+
+        <style>
+            :root {
+                --bg: #0e1015;
+                --panel: #151824;
+                --text: #f1f2f6;
+                --muted: #a3a8bb;
+                --accent: #4f8cff;
+                --border: #262a3a;
+            }
+
+            * {
+                box-sizing: border-box;
+                font-family:
+                    Inter,
+                    system-ui,
+                    -apple-system,
+                    BlinkMacSystemFont,
+                    sans-serif;
+            }
+
+            body {
+                margin: 0;
+                background: var(--bg);
+                color: var(--text);
+            }
+
+            header {
+                position: sticky;
+                top: 0;
+                z-index: 10;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 24px 48px;
+                border-bottom: 1px solid var(--border);
+                background: rgba(14, 16, 21, 0.9);
+                backdrop-filter: blur(10px);
+            }
+
+            header h1 {
+                font-size: 18px;
+                letter-spacing: 1px;
+                font-weight: 600;
+            }
+
+            header nav a {
+                margin-left: 28px;
+                text-decoration: none;
+                font-size: 14px;
+                color: var(--muted);
+            }
+
+            main {
+                min-height: 100vh;
+                padding: 48px;
+                max-width: 1400px;
+                margin: auto;
+            }
+
+            section {
+                margin-bottom: 80px;
+            }
+
+            .section-heading {
+                font-size: 28px;
+                font-weight: 500;
+                margin-bottom: 32px;
+            }
+
+            .grid {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 40px;
+            }
+
+            .product {
+                background: linear-gradient(180deg, #151824, #0e1015);
+                border: 1px solid var(--border);
+                border-radius: 24px;
+                padding: 40px;
+                display: grid;
+                grid-template-rows: auto 1fr auto;
+                transition:
+                    transform 0.25s ease,
+                    border-color 0.25s ease;
+            }
+
+            .product:hover {
+                transform: translateY(-6px);
+                border-color: var(--accent);
+            }
+
+            .product img {
+                width: 100%;
+                height: 240px;
+                object-fit: contain;
+                margin-bottom: 24px;
+                box-sizing: border-box;
+                background: #ffffff;
+                padding: 16px;
+                border-radius: 16px;
+            }
+
+            .product h2 {
+                font-size: 22px;
+                margin: 0 0 6px;
+            }
+
+            .product p {
+                font-size: 14px;
+                color: var(--muted);
+                margin: 0 0 18px;
+                max-width: 360px;
+            }
+
+            .price {
+                font-size: 20px;
+                margin-bottom: 20px;
+            }
+
+            .actions {
+                display: flex;
+                gap: 12px;
+            }
+
+            .btn {
+                flex: 1;
+                padding: 14px;
+                border-radius: 14px;
+                font-size: 14px;
+                border: none;
+                cursor: pointer;
+            }
+
+            .btn.primary {
+                background: var(--accent);
+                color: white;
+            }
+
+            .btn.secondary {
+                background: transparent;
+                color: var(--text);
+                border: 1px solid var(--border);
+            }
+
+            footer {
+                text-align: center;
+                font-size: 13px;
+                color: var(--muted);
+                padding: 40px 0;
+                border-top: 1px solid var(--border);
+            }
+
+            @media (max-width: 900px) {
+                main {
+                    padding: 24px;
+                }
+                .grid {
+                    grid-template-columns: 1fr;
+                }
+                header {
+                    padding: 20px 24px;
+                }
+            }
+        </style>
+    </head>
+
+    <body>
+        <header>
+            <h1>VISIONXR</h1>
+            <nav>
+                <a href="#eyewear">Eyewear</a>
+                <a href="#watches">Watches</a>
+            </nav>
+        </header>
+
+        <main id="content"></main>
+
+        <footer>© 2026 VisionXR — Virtual Try-On Experience</footer>
+
+        <script>
+            function renderSection(title, products) {
+                return `
+      <section id="${title.toLowerCase()}">
+        <div class="section-heading">${title}</div>
+        <div class="grid">
+          ${products
+              .map(
+                  (p) => `
+            <div class="product">
+              <img src="${p.image}" alt="${p.name}">
+              <h2>${p.name}</h2>
+              <p>${p.desc}</p>
+              <div class="price">${p.price}</div>
+              <div class="actions">
+                <button class="btn secondary">View Details</button>
+                ${
+                    p.type === "glasses"
+                        ? `<button class="btn primary" onclick="tryOn(${p.id})">Try On</button>`
+                        : `<button class="btn primary" onclick="handTryOn(${p.id})">Try On</button>`
+                }
+              </div>
+            </div>
+          `,
+              )
+              .join("")}
+        </div>
+      </section>
+    `;
+            }
+
+            function tryOn(productId) {
+                window.location.href = `face.html?product=${productId}`;
+            }
+
+            function handTryOn(productId) {
+                window.location.href = `hand.html?product=${productId}`;
+            }
+
+            function renderStore() {
+                const eyewear = Object.values(PRODUCTS).filter(
+                    (p) => p.type === "glasses",
+                );
+                const watches = Object.values(PRODUCTS).filter(
+                    (p) => p.type === "watch",
+                );
+
+                const html = `
+      ${renderSection("Eyewear", eyewear)}
+      ${renderSection("Watches", watches)}
+    `;
+
+                document.getElementById("content").innerHTML = html;
+            }
+
+            renderStore();
+        </script>
     </body>
 </html>

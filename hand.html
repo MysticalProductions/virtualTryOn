@@ -1,123 +1,354 @@
 <!doctype html>
-<html>
+<html lang="en">
     <head>
+        <meta charset="utf-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0, user-scalable=no"
+        />
         <title>Watch Try-On</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+        <!-- WEBAR HAND CORE -->
+        <script src="./libs/WebARRocksHand.js"></script>
+
+        <!-- THREE -->
+        <script src="https://unpkg.com/three@0.136.0/build/three.min.js"></script>
+        <script src="https://unpkg.com/three@0.136.0/examples/js/loaders/GLTFLoader.js"></script>
+
+        <!-- HELPERS -->
+        <script src="./helpers/HandTrackerThreeHelper.js"></script>
+        <script src="./helpers/PoseFlipFilter.js"></script>
+        <script src="./helpers/landmarksStabilizers/OneEuroLMStabilizer.js"></script>
+
+        <!-- SHARED PRODUCT DATA -->
+        <script src="js/products.js"></script>
+
         <style>
             body {
                 margin: 0;
                 overflow: hidden;
                 background: black;
+                font-family:
+                    Inter,
+                    system-ui,
+                    -apple-system,
+                    sans-serif;
+                color: white;
+            }
+
+            #canvases {
+                position: fixed;
+                inset: 0;
             }
 
             canvas {
+                position: absolute;
+                inset: 0;
+            }
+
+            #handTrackerCanvas {
+                z-index: 1;
+            }
+            #VTOCanvas {
+                z-index: 2;
+            }
+
+            .topbar {
                 position: fixed;
                 top: 0;
                 left: 0;
-                width: 100vw;
-                height: 100vh;
+                right: 0;
+                height: 56px;
+                display: flex;
+                align-items: center;
+                padding: 0 16px;
+                z-index: 5;
+                background: rgba(0, 0, 0, 0.5);
+                backdrop-filter: blur(10px);
             }
 
-            #webarCanvas {
-                z-index: 1;
+            .back {
+                cursor: pointer;
+                color: #ccc;
             }
-            #threeCanvas {
-                z-index: 2;
-                pointer-events: none;
+            .brand {
+                margin: auto;
+                font-weight: 600;
+            }
+
+            .panel {
+                position: fixed;
+                top: 72px;
+                right: 16px;
+                width: 320px;
+                z-index: 5;
+                padding: 18px;
+                background: rgba(15, 17, 21, 0.92);
+                backdrop-filter: blur(14px);
+                border-radius: 16px;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+            }
+
+            .title {
+                font-size: 20px;
+            }
+            .price {
+                font-size: 18px;
+                color: #4f8cff;
+            }
+            .desc {
+                font-size: 13px;
+                color: #aaa;
+                margin-bottom: 14px;
+            }
+
+            .switcher {
+                display: flex;
+                gap: 8px;
+                margin-bottom: 14px;
+                flex-wrap: wrap;
+            }
+
+            .switcher button {
+                padding: 8px 10px;
+                border-radius: 8px;
+                border: none;
+                cursor: pointer;
+                background: #2a2f3f;
+                color: white;
+                font-size: 12px;
+            }
+
+            .switcher button.active {
+                background: #4f8cff;
+            }
+
+            .cta {
+                width: 100%;
+                padding: 14px;
+                border-radius: 12px;
+                border: none;
+                font-size: 15px;
+                background: #4f8cff;
+                color: white;
+                cursor: pointer;
+            }
+
+            .instructions {
+                position: fixed;
+                inset: 0;
+                z-index: 6;
+                background: rgba(0, 0, 0, 0.6);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                text-align: center;
+            }
+
+            .instructions img {
+                max-width: 240px;
+                margin-top: 16px;
+            }
+
+            .instructions button {
+                margin-top: 20px;
+                padding: 12px 20px;
+                font-size: 16px;
+                border-radius: 10px;
+                border: none;
+                cursor: pointer;
             }
         </style>
     </head>
+
     <body>
-        <canvas id="webarCanvas"></canvas>
-        <canvas id="threeCanvas"></canvas>
+        <div class="topbar">
+            <div class="back" onclick="history.back()">← Back</div>
+            <div class="brand">VisionXR</div>
+        </div>
 
-        <script src="libs/WebARRocksHand.js"></script>
+        <div class="panel">
+            <div class="title" id="title"></div>
+            <div class="price" id="price"></div>
+            <div class="desc" id="desc"></div>
+            <div class="switcher" id="switcher"></div>
+            <button class="cta">Add to Cart</button>
+        </div>
 
-        <script type="importmap">
-            {
-                "imports": {
-                    "three": "https://unpkg.com/three@0.152.2/build/three.module.js",
-                    "three/addons/": "https://unpkg.com/three@0.152.2/examples/jsm/"
-                }
+        <div id="instructions" class="instructions">
+            <div>
+                Hold your wrist vertically<br />Fully visible in camera
+                <br />
+                <img src="./assets/VTOWristGuidline2.png" />
+                <br />
+                <button onclick="hideInstructions()">OK</button>
+            </div>
+        </div>
+
+        <div id="canvases">
+            <canvas id="VTOCanvas"></canvas>
+            <canvas id="handTrackerCanvas"></canvas>
+        </div>
+
+        <script>
+            let currentProduct;
+            let threeInstance;
+            let currentWatch = null;
+            const gltfLoader = new THREE.GLTFLoader();
+
+            function getSelectedProduct() {
+                const params = new URLSearchParams(window.location.search);
+                const id = parseInt(params.get("product"), 10);
+                return PRODUCTS[id] || Object.values(PRODUCTS)[0];
             }
-        </script>
 
-        <script type="module">
-            import * as THREE from "three";
-            import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+            function hideInstructions() {
+                document.getElementById("instructions").style.display = "none";
+            }
 
-            let scene, camera, renderer, watch;
+            function resizeCanvases() {
+                const dpr = window.devicePixelRatio || 1;
+                const w = window.innerWidth;
+                const h = window.innerHeight;
 
-            initThree();
-            initHand();
-            animate();
-
-            /* ---------- THREE ---------- */
-            function initThree() {
-                const canvas = document.getElementById("threeCanvas");
-
-                scene = new THREE.Scene();
-                camera = new THREE.PerspectiveCamera(
-                    40,
-                    window.innerWidth / window.innerHeight,
-                    0.1,
-                    100,
-                );
-                camera.position.z = 5;
-
-                renderer = new THREE.WebGLRenderer({
-                    canvas,
-                    alpha: true,
-                    antialias: true,
+                ["VTOCanvas", "handTrackerCanvas"].forEach((id) => {
+                    const c = document.getElementById(id);
+                    c.width = w * dpr;
+                    c.height = h * dpr;
+                    c.style.width = w + "px";
+                    c.style.height = h + "px";
                 });
-                renderer.setPixelRatio(window.devicePixelRatio);
-                renderer.setSize(window.innerWidth, window.innerHeight, false);
+            }
 
-                const light = new THREE.DirectionalLight(0xffffff, 1);
-                light.position.set(0, 1, 2);
+            function main() {
+                currentProduct = getSelectedProduct();
+                updateUI(currentProduct);
+                renderSwitcher(currentProduct.id);
+
+                resizeCanvases();
+                window.addEventListener("resize", resizeCanvases);
+
+                HandTrackerThreeHelper.init({
+                    VTOCanvas: document.getElementById("VTOCanvas"),
+                    handTrackerCanvas:
+                        document.getElementById("handTrackerCanvas"),
+
+                    videoSettings: {
+                        facingMode: "environment",
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        frameRate: { ideal: 30 },
+                    },
+
+                    spec: {
+                        canvasResolutionFactor: 1.5,
+                    },
+
+                    NNsPaths: ["./neuralNetsHand/NN_WRIST_27.json"],
+                    threshold: 0.95,
+
+                    poseLandmarksLabels: [
+                        "wristBack",
+                        "wristLeft",
+                        "wristRight",
+                        "wristPalm",
+                        "wristPalmTop",
+                        "wristBackTop",
+                    ],
+
+                    landmarksStabilizerSpec: {
+                        minCutOff: 0.001,
+                        beta: 5,
+                    },
+
+                    callbackTrack(state) {
+                        if (state.isDetected) hideInstructions();
+                    },
+                })
+                    .then(start)
+                    .catch(console.error);
+            }
+
+            function start(three) {
+                threeInstance = three;
+
+                const scene = three.scene;
+                scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.2));
+
+                const light = new THREE.PointLight(0xffffff, 1.2);
+                light.position.set(0, 100, 50);
                 scene.add(light);
 
-                const loader = new GLTFLoader();
-                loader.load("models/watch.glb", (gltf) => {
-                    watch = gltf.scene;
-                    scene.add(watch);
+                loadWatchModel(currentProduct.model);
+            }
+
+            function loadWatchModel(url) {
+                gltfLoader.load(url, (gltf) => {
+                    // Remove previous watch if exists
+                    if (currentWatch) {
+                        HandTrackerThreeHelper.remove_threeObject(currentWatch);
+                        currentWatch = null;
+                    }
+
+                    const watch = gltf.scene;
+
+                    // Correct AR scale
+                    watch.scale.setScalar(0.035);
+
+                    // Lay flat on wrist
+                    watch.rotation.set(Math.PI / 2, 0, Math.PI);
+
+                    // Slight lift above skin
+                    watch.position.set(0, 0.015, 0);
+
+                    watch.traverse((o) => {
+                        if (o.isMesh) {
+                            o.frustumCulled = false;
+                        }
+                    });
+
+                    // Attach to wrist landmark
+                    HandTrackerThreeHelper.add_threeObject(watch, "wristBack");
+
+                    currentWatch = watch;
                 });
-
-                window.addEventListener("resize", onResize);
             }
 
-            function onResize() {
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight, false);
+            function updateUI(p) {
+                document.getElementById("title").innerText = p.name;
+                document.getElementById("price").innerText = p.price;
+                document.getElementById("desc").innerText = p.desc;
             }
 
-            /* ---------- WEBAR ---------- */
-            function initHand() {
-                const HandTracker = window.WEBARROCKSHAND;
+            function renderSwitcher(activeId) {
+                const container = document.getElementById("switcher");
+                container.innerHTML = "";
 
-                HandTracker.init({
-                    canvasId: "webarCanvas",
-                    NNsPath: "neuralNetsHand/",
-
-                    callbackTrack: (hand) => {
-                        if (!watch || !hand || !hand.isDetected) return;
-
-                        const wrist = hand.landmarks[0];
-
-                        const x = (wrist.x - 0.5) * 4;
-                        const y = -(wrist.y - 0.5) * 4;
-
-                        watch.position.set(x, y, -2);
-                    },
-                });
+                Object.values(PRODUCTS)
+                    .filter((p) => p.type === "watch")
+                    .forEach((p) => {
+                        const btn = document.createElement("button");
+                        btn.textContent = p.name;
+                        btn.className = p.id === activeId ? "active" : "";
+                        btn.onclick = () => selectProduct(p.id);
+                        container.appendChild(btn);
+                    });
             }
 
-            /* ---------- LOOP ---------- */
-            function animate() {
-                requestAnimationFrame(animate);
-                if (renderer) renderer.render(scene, camera);
+            function selectProduct(id) {
+                const p = PRODUCTS[id];
+                if (!p) return;
+
+                currentProduct = p;
+                history.replaceState({}, "", `?product=${id}`);
+                updateUI(p);
+
+                HandTrackerThreeHelper.remove_threeObjects();
+                loadWatchModel(p.model);
+                renderSwitcher(id);
             }
+
+            window.addEventListener("load", main);
         </script>
     </body>
 </html>
