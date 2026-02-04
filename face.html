@@ -181,11 +181,24 @@
 
         <script>
             let currentProduct;
+            let DPR = Math.min(window.devicePixelRatio || 1, 2);
+            let isInitialized = false;
+            let isSwitching = false;
+
+            /* -------------------------
+           PRODUCT HELPERS
+        -------------------------- */
 
             function getSelectedProduct() {
                 const params = new URLSearchParams(window.location.search);
                 const id = parseInt(params.get("product"), 10);
                 return PRODUCTS[id] || Object.values(PRODUCTS)[0];
+            }
+
+            function updateUI(p) {
+                document.getElementById("title").innerText = p.name;
+                document.getElementById("price").innerText = p.price;
+                document.getElementById("desc").innerText = p.desc;
             }
 
             function renderSwitcher(activeId) {
@@ -198,35 +211,42 @@
                         const btn = document.createElement("button");
                         btn.textContent = p.name;
                         btn.className = p.id === activeId ? "active" : "";
+                        btn.disabled = isSwitching;
                         btn.onclick = () => selectProduct(p.id);
                         container.appendChild(btn);
                     });
             }
 
-            function selectProduct(id) {
-                const p = PRODUCTS[id];
-                if (!p) return;
+            /* -------------------------
+           MODEL SWITCH (NO DESTROY)
+        -------------------------- */
 
+            async function selectProduct(id) {
+                if (isSwitching) return;
+
+                const p = PRODUCTS[id];
+                if (!p || p.id === currentProduct?.id) return;
+
+                isSwitching = true;
                 currentProduct = p;
 
                 history.replaceState({}, "", `?product=${id}`);
-
-                document.getElementById("title").innerText = p.name;
-                document.getElementById("price").innerText = p.price;
-                document.getElementById("desc").innerText = p.desc;
-
-                WebARRocksMirror.load(p.model);
+                updateUI(p);
                 renderSwitcher(id);
+
+                // 🔄 Smooth model swap (no re-init)
+                await WebARRocksMirror.load(p.model);
+
+                isSwitching = false;
+                renderSwitcher(p.id);
             }
 
-            function main() {
-                currentProduct = getSelectedProduct();
+            /* -------------------------
+           AR INIT (ONCE)
+        -------------------------- */
 
-                document.getElementById("title").innerText =
-                    currentProduct.name;
-                document.getElementById("price").innerText =
-                    currentProduct.price;
-                document.getElementById("desc").innerText = currentProduct.desc;
+            function initMirror(modelURL) {
+                if (isInitialized) return;
 
                 WebARRocksMirror.init({
                     canvasFace: document.getElementById("WebARRocksFaceCanvas"),
@@ -235,21 +255,46 @@
                     specWebARRocksFace: {
                         NNCPath: "./neuralNetsFace/NN_GLASSES_9.json",
                         maxFacesDetected: 1,
+
+                        // 🧠 MAXIMUM STABILITY CONFIG
+                        landmarksStabilizerSpec: {
+                            stabilizer: WebARRocksLMStabilizer,
+                            smoothFactor: 0.97,
+                            minCutOff: 0.0004,
+                            beta: 0.4,
+                            frequency: 60,
+                        },
                     },
 
-                    modelURL: currentProduct.model,
+                    modelURL,
                     occluderURL: false,
 
-                    width: window.innerWidth,
-                    height: window.innerHeight,
+                    // Small forward offset reduces depth jitter
+                    translationOffset: [0, 0, 0.02],
+
+                    width: window.innerWidth * DPR,
+                    height: window.innerHeight * DPR,
                 });
 
+                isInitialized = true;
+            }
+
+            /* -------------------------
+           MAIN
+        -------------------------- */
+
+            function main() {
+                currentProduct = getSelectedProduct();
+                updateUI(currentProduct);
                 renderSwitcher(currentProduct.id);
 
+                initMirror(currentProduct.model);
+
                 window.addEventListener("resize", () => {
+                    DPR = Math.min(window.devicePixelRatio || 1, 2);
                     WebARRocksMirror.resize(
-                        window.innerWidth,
-                        window.innerHeight,
+                        window.innerWidth * DPR,
+                        window.innerHeight * DPR,
                     );
                 });
             }

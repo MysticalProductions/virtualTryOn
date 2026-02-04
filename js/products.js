@@ -33,6 +33,6 @@ const PRODUCTS = {
     price: "₹5,499",
     desc: "Italian leather strap with a minimalist dial.",
     image: "assets/watch2.png",
-    model: "./models/watch2.glb",
+    model: "./models/wrist_watch.glb",
   },
 };

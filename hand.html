@@ -262,7 +262,10 @@
                     },
 
                     callbackTrack(state) {
-                        if (state.isDetected) hideInstructions();
+                        if (state.isDetected) {
+                            hideInstructions();
+                            console.log("Hand detected");
+                        }
                     },
                 })
                     .then(start)
@@ -282,35 +285,30 @@
                 loadWatchModel(currentProduct.model);
             }
 
-            function loadWatchModel(url) {
-                gltfLoader.load(url, (gltf) => {
-                    // Remove previous watch if exists
-                    if (currentWatch) {
-                        HandTrackerThreeHelper.remove_threeObject(currentWatch);
-                        currentWatch = null;
-                    }
-
+            function loadWatchModel(url, manager) {
+                new THREE.GLTFLoader(manager).load(url, function (gltf) {
                     const watch = gltf.scene;
 
-                    // Correct AR scale
-                    watch.scale.setScalar(0.035);
+                    // 🔑 Center pivot (critical)
+                    const box = new THREE.Box3().setFromObject(watch);
+                    const center = box.getCenter(new THREE.Vector3());
+                    watch.position.sub(center);
 
-                    // Lay flat on wrist
-                    watch.rotation.set(Math.PI / 2, 0, Math.PI);
+                    // 🔑 Wrist orientation (critical)
+                    watch.rotation.x = -Math.PI / 2;
 
-                    // Slight lift above skin
-                    watch.position.set(0, 0.015, 0);
+                    // 🔑 Correct wrist scale (start visible)
+                    watch.scale.setScalar(1.5);
 
+                    // 🔑 Ensure visibility
                     watch.traverse((o) => {
                         if (o.isMesh) {
                             o.frustumCulled = false;
+                            o.material.depthWrite = true;
                         }
                     });
 
-                    // Attach to wrist landmark
-                    HandTrackerThreeHelper.add_threeObject(watch, "wristBack");
-
-                    currentWatch = watch;
+                    HandTrackerThreeHelper.add_threeObject(watch);
                 });
             }
 
