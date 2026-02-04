@@ -1,0 +1,60 @@
+<script>
+    let frameCount = 0;
+
+    function getSelectedProduct() {
+        const params = new URLSearchParams(window.location.search);
+        const id = parseInt(params.get("product"), 10);
+        return PRODUCTS[id] || Object.values(PRODUCTS)[0];
+    }
+
+    function main() {
+        const product = getSelectedProduct();
+
+        console.log("INIT AR WITH PRODUCT:", product);
+
+        WebARRocksMirror.init({
+            canvasFace: document.getElementById("WebARRocksFaceCanvas"),
+            canvasThree: document.getElementById("threeCanvas"),
+
+            specWebARRocksFace: {
+                NNCPath: "./neuralNetsFace/NN_GLASSES_9.json",
+                maxFacesDetected: 1,
+            },
+
+            modelURL: product.model,
+            occluderURL: false,
+
+            width: window.innerWidth,
+            height: window.innerHeight,
+
+            callbackTrack: (detectState) => {
+                frameCount++;
+
+                // HARD PROOF LOG
+                console.log(
+                    "TRACK",
+                    frameCount,
+                    "confidence:",
+                    detectState.detected,
+                );
+
+                // DOM PROOF
+                document.body.innerHTML = `
+                <div style="
+                    position:fixed;
+                    inset:0;
+                    background:black;
+                    color:white;
+                    font-family:monospace;
+                    padding:20px;
+                ">
+                    Frames: ${frameCount}<br>
+                    Confidence: ${detectState.detected.toFixed(3)}
+                </div>
+            `;
+            },
+        });
+    }
+
+    window.addEventListener("load", main);
+</script>
