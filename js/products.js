@@ -17,22 +17,14 @@ const PRODUCTS = {
     image: "assets/glass2.png",
     model: "./models/glass2.glb",
   },
+
   3: {
     id: 3,
-    type: "watch",
-    name: "Chrono Steel",
-    price: "₹6,999",
-    desc: "42mm stainless steel chronograph with sapphire glass.",
-    image: "assets/watch1.png",
-    model: "./models/watch1.glb",
-  },
-  4: {
-    id: 4,
     type: "watch",
     name: "Minimal Leather",
     price: "₹5,499",
     desc: "Italian leather strap with a minimalist dial.",
-    image: "assets/watch2.png",
-    model: "./models/wrist_watch.glb",
+    image: "assets/watch1.png",
+    model: "./models/watchCasio.glb",
   },
 };

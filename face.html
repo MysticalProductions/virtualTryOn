@@ -202,11 +202,12 @@
                     canvasFace: document.getElementById("WebARRocksFaceCanvas"),
                     canvasThree: document.getElementById("threeCanvas"),
 
+                    isMirror: true,
+
                     specWebARRocksFace: {
                         NNCPath: "./neuralNetsFace/NN_GLASSES_9.json",
                         maxFacesDetected: 1,
 
-                        // 🧠 MAXIMUM STABILITY CONFIG
                         landmarksStabilizerSpec: {
                             stabilizer: WebARRocksLMStabilizer,
                             smoothFactor: 0.97,
@@ -216,10 +217,8 @@
                         },
                     },
 
-                    modelURL,
+                    modelURL: modelURL, // ✅ FIX
                     occluderURL: false,
-
-                    // Small forward offset reduces depth jitter
                     translationOffset: [0, 0, 0.02],
 
                     width: window.innerWidth * DPR,

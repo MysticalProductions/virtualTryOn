@@ -71,6 +71,7 @@
             .section-heading {
                 font-size: 28px;
                 margin-bottom: 32px;
+                margin-top: 32px;
             }
 
             .grid {
@@ -224,7 +225,7 @@
         <main id="content"></main>
 
         <footer style="text-align: center; color: #888; padding: 40px 0">
-            © 2026 VisionXR — Virtual Try-On Experience
+            © 2026 Mystical Productions — Virtual Try-On Experience
         </footer>
 
         <!-- TRY-ON MODAL -->
@@ -269,10 +270,14 @@
                 const eyewear = Object.values(PRODUCTS).filter(
                     (p) => p.type === "glasses",
                 );
-                document.getElementById("content").innerHTML = renderSection(
-                    "Eyewear",
-                    eyewear,
+
+                const watches = Object.values(PRODUCTS).filter(
+                    (p) => p.type === "watch",
                 );
+
+                document.getElementById("content").innerHTML =
+                    renderSection("Eyewear", eyewear) +
+                    renderSection("Watches", watches);
             }
 
             /* MODAL CONTROLS */
@@ -280,7 +285,16 @@
                 const modal = document.getElementById("tryonModal");
                 const frame = document.getElementById("tryonFrame");
 
-                frame.src = `face.html?product=${productId}`;
+                const product = PRODUCTS[productId];
+
+                if (!product) return;
+
+                if (product.type === "watch") {
+                    frame.src = `hand.html?product=${productId}`;
+                } else {
+                    frame.src = `face.html?product=${productId}`;
+                }
+
                 modal.classList.add("active");
             }
 

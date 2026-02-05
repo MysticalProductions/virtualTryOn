@@ -1,60 +1,142 @@
-<script>
-    let frameCount = 0;
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+        />
 
-    function getSelectedProduct() {
-        const params = new URLSearchParams(window.location.search);
-        const id = parseInt(params.get("product"), 10);
-        return PRODUCTS[id] || Object.values(PRODUCTS)[0];
-    }
+        <title>VisionXR - Watch Try-On</title>
 
-    function main() {
-        const product = getSelectedProduct();
+        <script src="libs/WebARRocksHand.js"></script>
 
-        console.log("INIT AR WITH PRODUCT:", product);
+        <script src="https://cdn.jsdelivr.net/npm/three@0.136.0/build/three.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/three@0.136.0/examples/js/loaders/GLTFLoader.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/three@0.136.0/examples/js/loaders/RGBELoader.js"></script>
 
-        WebARRocksMirror.init({
-            canvasFace: document.getElementById("WebARRocksFaceCanvas"),
-            canvasThree: document.getElementById("threeCanvas"),
+        <script src="./helpers/ChangeCameraHelper.js"></script>
+        <script src="./helpers/HandTrackerThreeHelper.js"></script>
+        <script src="./helpers/PoseFlipFilter.js"></script>
+        <script src="./helpers/landmarksStabilizers/OneEuroLMStabilizer.js"></script>
+        <script src="js/products.js"></script>
+        <script src="js/main.js"></script>
 
-            specWebARRocksFace: {
-                NNCPath: "./neuralNetsFace/NN_GLASSES_9.json",
-                maxFacesDetected: 1,
-            },
+        <link
+            href="https://fonts.googleapis.com/css?family=Roboto&display=swap"
+            rel="stylesheet"
+        />
 
-            modelURL: product.model,
-            occluderURL: false,
+        <style type="text/css">
+            body {
+                background-color: #333;
+                margin: 0;
+                overflow: hidden;
+                font-family: "Roboto", sans-serif;
+            }
+            canvas {
+                position: fixed;
+                top: 0;
+                left: 50%;
+                height: 100vh;
+                /* Mirror for selfie mode as per reference */
+                transform: translate(-50%, 0%) rotateY(180deg);
+            }
+            #handTrackerCanvas {
+                z-index: 1;
+            }
+            #VTOCanvas {
+                z-index: 3;
+            } /* Fixed iOS Safari bug from main.js */
 
-            width: window.innerWidth,
-            height: window.innerHeight,
+            .modal {
+                display: flex;
+                flex-direction: column;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                transition-duration: 500ms;
+                position: fixed;
+            }
 
-            callbackTrack: (detectState) => {
-                frameCount++;
+            #loading {
+                background: #1c3e83;
+                color: white;
+                opacity: 1;
+                z-index: 10;
+            }
+            #loading > div {
+                margin: auto;
+                font-size: 32pt;
+            }
 
-                // HARD PROOF LOG
-                console.log(
-                    "TRACK",
-                    frameCount,
-                    "confidence:",
-                    detectState.detected,
-                );
+            #instructions {
+                z-index: 9;
+                background-color: rgba(0, 0, 0, 0.5);
+                color: white;
+                font-size: 22px;
+            }
+            #instructions > div {
+                margin: auto;
+                text-align: center;
+                line-height: 1.5em;
+            }
 
-                // DOM PROOF
-                document.body.innerHTML = `
-                <div style="
-                    position:fixed;
-                    inset:0;
-                    background:black;
-                    color:white;
-                    font-family:monospace;
-                    padding:20px;
-                ">
-                    Frames: ${frameCount}<br>
-                    Confidence: ${detectState.detected.toFixed(3)}
-                </div>
-            `;
-            },
-        });
-    }
+            .instructionsOK {
+                border: 1px solid white;
+                background: transparent;
+                color: white;
+                font-size: 22px;
+                padding: 22px;
+                margin: 1em;
+                cursor: pointer;
+                width: 200px;
+            }
+            .instructionsImg {
+                margin-top: 12px;
+                max-height: 50vh;
+                max-width: 50vw;
+            }
 
-    window.addEventListener("load", main);
-</script>
+            #changeCamera {
+                display: none;
+                position: fixed;
+                z-index: 4;
+                bottom: 6px;
+                left: 6px;
+                background-color: rgba(0, 0, 0, 0.5);
+                color: white;
+                border: none;
+                padding: 12px;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="loading" class="modal">
+            <div>LOADING...</div>
+        </div>
+
+        <div id="instructions" class="modal">
+            <div>
+                Place your hand as shown:<br />
+                <img
+                    src="assets/VTOWristGuidline2.png"
+                    class="instructionsImg"
+                /><br />
+                <button class="instructionsOK" onclick="hide_instructions()">
+                    OK
+                </button>
+            </div>
+        </div>
+
+        <div id="canvases">
+            <canvas id="VTOCanvas"></canvas>
+            <canvas id="handTrackerCanvas"></canvas>
+        </div>
+
+        <button onclick="change_camera()" id="changeCamera">
+            Change camera
+        </button>
+    </body>
+</html>

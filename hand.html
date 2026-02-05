@@ -6,53 +6,43 @@
             name="viewport"
             content="width=device-width, initial-scale=1.0, user-scalable=no"
         />
-        <title>Watch Try-On</title>
+        <title>VisionXR - Watch Try-On</title>
 
-        <!-- WEBAR HAND CORE -->
-        <script src="./libs/WebARRocksHand.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/three@0.136.0/build/three.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/three@0.136.0/examples/js/loaders/GLTFLoader.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/three@0.136.0/examples/js/loaders/RGBELoader.js"></script>
 
-        <!-- THREE -->
-        <script src="https://unpkg.com/three@0.136.0/build/three.min.js"></script>
-        <script src="https://unpkg.com/three@0.136.0/examples/js/loaders/GLTFLoader.js"></script>
-
-        <!-- HELPERS -->
+        <script src="libs/WebARRocksHand.js"></script>
         <script src="./helpers/HandTrackerThreeHelper.js"></script>
         <script src="./helpers/PoseFlipFilter.js"></script>
         <script src="./helpers/landmarksStabilizers/OneEuroLMStabilizer.js"></script>
-
-        <!-- SHARED PRODUCT DATA -->
         <script src="js/products.js"></script>
 
         <style>
             body {
                 margin: 0;
                 overflow: hidden;
-                background: black;
-                font-family:
-                    Inter,
-                    system-ui,
-                    -apple-system,
-                    sans-serif;
+                background: #333;
+                font-family: "Inter", sans-serif;
                 color: white;
             }
-
             #canvases {
                 position: fixed;
                 inset: 0;
             }
-
             canvas {
                 position: absolute;
-                inset: 0;
+                top: 0;
+                left: 50%;
+                height: 100vh;
+                transform: translate(-50%, 0%) rotateY(180deg);
             }
-
             #handTrackerCanvas {
                 z-index: 1;
             }
             #VTOCanvas {
                 z-index: 2;
             }
-
             .topbar {
                 position: fixed;
                 top: 0;
@@ -66,74 +56,6 @@
                 background: rgba(0, 0, 0, 0.5);
                 backdrop-filter: blur(10px);
             }
-
-            .back {
-                cursor: pointer;
-                color: #ccc;
-            }
-            .brand {
-                margin: auto;
-                font-weight: 600;
-            }
-
-            .panel {
-                position: fixed;
-                top: 72px;
-                right: 16px;
-                width: 320px;
-                z-index: 5;
-                padding: 18px;
-                background: rgba(15, 17, 21, 0.92);
-                backdrop-filter: blur(14px);
-                border-radius: 16px;
-                border: 1px solid rgba(255, 255, 255, 0.08);
-            }
-
-            .title {
-                font-size: 20px;
-            }
-            .price {
-                font-size: 18px;
-                color: #4f8cff;
-            }
-            .desc {
-                font-size: 13px;
-                color: #aaa;
-                margin-bottom: 14px;
-            }
-
-            .switcher {
-                display: flex;
-                gap: 8px;
-                margin-bottom: 14px;
-                flex-wrap: wrap;
-            }
-
-            .switcher button {
-                padding: 8px 10px;
-                border-radius: 8px;
-                border: none;
-                cursor: pointer;
-                background: #2a2f3f;
-                color: white;
-                font-size: 12px;
-            }
-
-            .switcher button.active {
-                background: #4f8cff;
-            }
-
-            .cta {
-                width: 100%;
-                padding: 14px;
-                border-radius: 12px;
-                border: none;
-                font-size: 15px;
-                background: #4f8cff;
-                color: white;
-                cursor: pointer;
-            }
-
             .instructions {
                 position: fixed;
                 inset: 0;
@@ -144,128 +66,110 @@
                 justify-content: center;
                 text-align: center;
             }
-
-            .instructions img {
-                max-width: 240px;
-                margin-top: 16px;
-            }
-
-            .instructions button {
-                margin-top: 20px;
-                padding: 12px 20px;
-                font-size: 16px;
-                border-radius: 10px;
-                border: none;
-                cursor: pointer;
-            }
         </style>
     </head>
 
     <body>
         <div class="topbar">
-            <div class="back" onclick="history.back()">← Back</div>
-            <div class="brand">VisionXR</div>
-        </div>
-
-        <div class="panel">
-            <div class="title" id="title"></div>
-            <div class="price" id="price"></div>
-            <div class="desc" id="desc"></div>
-            <div class="switcher" id="switcher"></div>
-            <button class="cta">Add to Cart</button>
+            <div class="back" onclick="history.back()" style="cursor: pointer">
+                ← Back
+            </div>
+            <div class="brand" style="margin: auto">VisionXR</div>
         </div>
 
         <div id="instructions" class="instructions">
             <div>
-                Hold your wrist vertically<br />Fully visible in camera
-                <br />
-                <img src="./assets/VTOWristGuidline2.png" />
-                <br />
-                <button onclick="hideInstructions()">OK</button>
+                Place your hand as shown:<br />
+                <img
+                    src="./assets/VTOWristGuidline2.png"
+                    style="max-width: 240px; margin-top: 16px"
+                /><br />
+                <button
+                    onclick="hideInstructions()"
+                    style="margin-top: 20px; padding: 10px 20px"
+                >
+                    OK
+                </button>
             </div>
         </div>
 
         <div id="canvases">
-            <canvas id="VTOCanvas"></canvas>
             <canvas id="handTrackerCanvas"></canvas>
+            <canvas id="VTOCanvas"></canvas>
         </div>
 
         <script>
-            let currentProduct;
-            let threeInstance;
-            let currentWatch = null;
-            const gltfLoader = new THREE.GLTFLoader();
+            const _settings = {
+                threshold: 0.97,
+                modelScale: 1.2 * 1.462,
+                modelOffset: [0, 0, 0],
+                modelQuaternion: [0, 0, 0, 1],
 
-            function getSelectedProduct() {
-                const params = new URLSearchParams(window.location.search);
-                const id = parseInt(params.get("product"), 10);
-                return PRODUCTS[id] || Object.values(PRODUCTS)[0];
-            }
+                // Occluder settings from main.js
+                occluderRadiusRange: [4, 4.7],
+                occluderHeight: 48,
+                occluderOffset: [0, 0, 0],
+                occluderQuaternion: [0.707, 0, 0, 0.707],
+                occluderFlattenCoeff: 0.6,
+
+                stabilizerOptions: {
+                    minCutOff: 0.001,
+                    beta: 4,
+                    freqRange: [2, 144],
+                    forceFilterNNInputPxRange: [2.5, 6],
+                },
+            };
+
+            let currentProduct;
+            let _isInstructionsHidden = false;
 
             function hideInstructions() {
-                document.getElementById("instructions").style.display = "none";
+                const inst = document.getElementById("instructions");
+                if (inst) {
+                    inst.style.opacity = 0;
+                    setTimeout(() => inst.remove(), 500);
+                }
+                _isInstructionsHidden = true;
             }
 
-            function resizeCanvases() {
-                const dpr = window.devicePixelRatio || 1;
-                const w = window.innerWidth;
-                const h = window.innerHeight;
-
-                ["VTOCanvas", "handTrackerCanvas"].forEach((id) => {
-                    const c = document.getElementById(id);
-                    c.width = w * dpr;
-                    c.height = h * dpr;
-                    c.style.width = w + "px";
-                    c.style.height = h + "px";
-                });
+            function size_canvas(cv) {
+                const pixelRatio = window.devicePixelRatio || 1;
+                cv.width = pixelRatio * window.innerWidth;
+                cv.height = pixelRatio * window.innerHeight;
             }
 
             function main() {
-                currentProduct = getSelectedProduct();
-                updateUI(currentProduct);
-                renderSwitcher(currentProduct.id);
+                const params = new URLSearchParams(window.location.search);
+                const id = parseInt(params.get("product"), 10) || 0;
+                currentProduct = PRODUCTS[id];
 
-                resizeCanvases();
-                window.addEventListener("resize", resizeCanvases);
+                const handTrackerCanvas =
+                    document.getElementById("handTrackerCanvas");
+                const VTOCanvas = document.getElementById("VTOCanvas");
+                size_canvas(handTrackerCanvas);
+                size_canvas(VTOCanvas);
 
                 HandTrackerThreeHelper.init({
-                    VTOCanvas: document.getElementById("VTOCanvas"),
-                    handTrackerCanvas:
-                        document.getElementById("handTrackerCanvas"),
-
-                    videoSettings: {
-                        facingMode: "environment",
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 },
-                        frameRate: { ideal: 30 },
-                    },
-
-                    spec: {
-                        canvasResolutionFactor: 1.5,
-                    },
-
-                    NNsPaths: ["./neuralNetsHand/NN_WRIST_27.json"],
-                    threshold: 0.95,
-
+                    landmarksStabilizerSpec: _settings.stabilizerOptions,
+                    NNsPaths: ["neuralNetsHand/NN_WRISTBACK_45.json"],
+                    threshold: _settings.threshold,
                     poseLandmarksLabels: [
-                        "wristBack",
-                        "wristLeft",
-                        "wristRight",
-                        "wristPalm",
-                        "wristPalmTop",
-                        "wristBackTop",
+                        "wristPinkySideBot",
+                        "wristThumbSideBot",
+                        "wristPinkySideTop",
+                        "wristThumbSideTop",
+                        "wristUpTop",
+                        "wristUpBot",
+                        "wristDownTop",
+                        "wristDownBot",
                     ],
-
-                    landmarksStabilizerSpec: {
-                        minCutOff: 0.001,
-                        beta: 5,
-                    },
-
-                    callbackTrack(state) {
-                        if (state.isDetected) {
+                    poseFilter: PoseFlipFilter.instance({}),
+                    VTOCanvas: VTOCanvas,
+                    handTrackerCanvas: handTrackerCanvas,
+                    videoSettings: { facingMode: "user" },
+                    callbackTrack: (state) => {
+                        if (state.isDetected && !_isInstructionsHidden)
                             hideInstructions();
-                            console.log("Hand detected");
-                        }
                     },
                 })
                     .then(start)
@@ -273,77 +177,74 @@
             }
 
             function start(three) {
-                threeInstance = three;
-
-                const scene = three.scene;
-                scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.2));
-
-                const light = new THREE.PointLight(0xffffff, 1.2);
-                light.position.set(0, 100, 50);
-                scene.add(light);
-
-                loadWatchModel(currentProduct.model);
-            }
-
-            function loadWatchModel(url, manager) {
-                new THREE.GLTFLoader(manager).load(url, function (gltf) {
-                    const watch = gltf.scene;
-
-                    // 🔑 Center pivot (critical)
-                    const box = new THREE.Box3().setFromObject(watch);
-                    const center = box.getCenter(new THREE.Vector3());
-                    watch.position.sub(center);
-
-                    // 🔑 Wrist orientation (critical)
-                    watch.rotation.x = -Math.PI / 2;
-
-                    // 🔑 Correct wrist scale (start visible)
-                    watch.scale.setScalar(1.5);
-
-                    // 🔑 Ensure visibility
-                    watch.traverse((o) => {
-                        if (o.isMesh) {
-                            o.frustumCulled = false;
-                            o.material.depthWrite = true;
-                        }
+                const pmremGenerator = new THREE.PMREMGenerator(three.renderer);
+                new THREE.RGBELoader()
+                    .setDataType(THREE.HalfFloatType)
+                    .load("assets/hotel_room_1k.hdr", (texture) => {
+                        three.scene.environment =
+                            pmremGenerator.fromEquirectangular(texture).texture;
+                        pmremGenerator.dispose();
                     });
 
-                    HandTrackerThreeHelper.add_threeObject(watch);
-                });
+                three.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                three.renderer.outputEncoding = THREE.sRGBEncoding;
+
+                // Add Soft Occluder
+                const occluderRadius = _settings.occluderRadiusRange[1];
+                const occluderMesh = new THREE.Mesh(
+                    new THREE.CylinderGeometry(
+                        occluderRadius,
+                        occluderRadius,
+                        _settings.occluderHeight,
+                        32,
+                        1,
+                        true,
+                    ),
+                    new THREE.MeshNormalMaterial(),
+                );
+                occluderMesh.position.fromArray(_settings.occluderOffset);
+                occluderMesh.quaternion.fromArray(_settings.occluderQuaternion);
+                occluderMesh.scale.set(
+                    1.0,
+                    1.0,
+                    _settings.occluderFlattenCoeff,
+                );
+
+                HandTrackerThreeHelper.add_threeSoftOccluder(
+                    occluderMesh,
+                    occluderRadius,
+                    _settings.occluderRadiusRange[1] -
+                        _settings.occluderRadiusRange[0],
+                    false,
+                );
+
+                loadWatchModel(three);
             }
 
-            function updateUI(p) {
-                document.getElementById("title").innerText = p.name;
-                document.getElementById("price").innerText = p.price;
-                document.getElementById("desc").innerText = p.desc;
-            }
+            function loadWatchModel(three) {
+                new THREE.GLTFLoader(three.loadingManager).load(
+                    currentProduct.model,
+                    (gltf) => {
+                        const model = gltf.scene.children[0];
+                        model.scale.set(1, 1, 1);
 
-            function renderSwitcher(activeId) {
-                const container = document.getElementById("switcher");
-                container.innerHTML = "";
+                        if (_settings.modelScale)
+                            model.scale.multiplyScalar(_settings.modelScale);
 
-                Object.values(PRODUCTS)
-                    .filter((p) => p.type === "watch")
-                    .forEach((p) => {
-                        const btn = document.createElement("button");
-                        btn.textContent = p.name;
-                        btn.className = p.id === activeId ? "active" : "";
-                        btn.onclick = () => selectProduct(p.id);
-                        container.appendChild(btn);
-                    });
-            }
+                        const d = _settings.modelOffset;
+                        const displacement = new THREE.Vector3(
+                            d[0],
+                            d[2],
+                            -d[1],
+                        );
+                        model.position.add(displacement);
 
-            function selectProduct(id) {
-                const p = PRODUCTS[id];
-                if (!p) return;
+                        const q = _settings.modelQuaternion;
+                        model.quaternion.set(q[0], q[2], -q[1], q[3]);
 
-                currentProduct = p;
-                history.replaceState({}, "", `?product=${id}`);
-                updateUI(p);
-
-                HandTrackerThreeHelper.remove_threeObjects();
-                loadWatchModel(p.model);
-                renderSwitcher(id);
+                        HandTrackerThreeHelper.add_threeObject(model);
+                    },
+                );
             }
 
             window.addEventListener("load", main);
