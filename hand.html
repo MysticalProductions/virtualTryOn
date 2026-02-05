@@ -166,7 +166,7 @@
                     poseFilter: PoseFlipFilter.instance({}),
                     VTOCanvas: VTOCanvas,
                     handTrackerCanvas: handTrackerCanvas,
-                    videoSettings: { facingMode: "environment" },
+                    videoSettings: { facingMode: "user" },
                     callbackTrack: (state) => {
                         if (state.isDetected && !_isInstructionsHidden)
                             hideInstructions();
