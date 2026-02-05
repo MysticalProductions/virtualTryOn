@@ -168,9 +168,6 @@
         </div>
 
         <!-- PRODUCT PANEL -->
-        <div class="panel">
-            <div class="title" id="title"></div>
-        </div>
 
         <script>
             let currentProduct;
@@ -185,10 +182,6 @@
                 const params = new URLSearchParams(window.location.search);
                 const id = parseInt(params.get("product"), 10);
                 return PRODUCTS[id] || Object.values(PRODUCTS)[0];
-            }
-
-            function updateUI(p) {
-                document.getElementById("title").innerText = p.name;
             }
 
             /* -------------------------
@@ -219,7 +212,7 @@
 
                     modelURL: modelURL, // ✅ FIX
                     occluderURL: false,
-                    translationOffset: [0, 0, 0.02],
+                    translationOffset: [0, -8, 0.02],
 
                     width: window.innerWidth * DPR,
                     height: window.innerHeight * DPR,
@@ -234,7 +227,6 @@
 
             function main() {
                 currentProduct = getSelectedProduct();
-                updateUI(currentProduct);
 
                 initMirror(currentProduct.model);
 
